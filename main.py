@@ -1,8 +1,8 @@
 
 #!/usr/bin/env python3
 """
-AI-SOC Copilot v3.0: Complete Multi-Model Security Analysis System
-Supports: Claude, GPT-4, Gemini, Ollama
+AI-SOC Copilot v3.0: RAG-Enhanced Security Analysis System
+Powered by: OpenAI GPT-4o + LangChain + Milvus
 Datasets: MORDOR, UNSW-NB15, CICIDS2017, Splunk/ELK
 """
 
@@ -18,15 +18,21 @@ from typing import List, Dict, Optional
 import pandas as pd
 from pathlib import Path
 
+# RAG Module
+from rag_module import RAGManager
+
 class AISOCCopilot:
     """Main SOC Analysis System"""
     
-    def _init_(self):
-        self.model_provider = None
+    def __init__(self):
+        self.model_provider = "openai"  # Fixed to OpenAI only
         self.client = None
         self.api_key = None
         self.alerts = []
         self.stats = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "dismissed": 0}
+        self.rag_manager = None
+        self.use_rag = False
+        self.current_dataset_type = None
     
     def display_banner(self):
         """Display welcome banner"""
@@ -36,177 +42,57 @@ class AISOCCopilot:
 ║              🛡  AI-SOC COPILOT v3.0                             ║
 ║              Intelligent Security Operations Center              ║
 ║                                                                  ║
-║              Multi-Model | Multi-Dataset | Production Ready      ║
-║              Developers: Luckychowdary		          ║
+║         OpenAI + LangChain + RAG | Production Ready              ║
+║              Developer: Luckychowdary                            ║
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
         """)
     
     def select_ai_model(self):
-        """Interactive AI model selection"""
+        """Initialize OpenAI model"""
         print("\n" + "="*70)
-        print("🤖 SELECT AI MODEL FOR ANALYSIS")
+        print("🤖 AI MODEL CONFIGURATION")
         print("="*70 + "\n")
         
-        # Check for available API keys
-        claude_key = os.getenv("ANTHROPIC_API_KEY")
+        # Check for OpenAI API key
         openai_key = os.getenv("OPENAI_API_KEY")
-        gemini_key = os.getenv("GOOGLE_API_KEY")
         
-        models = []
-        
-        # Model 1: Claude
-        models.append({
-            "num": "1",
-            "name": "Anthropic Claude Sonnet 4",
-            "provider": "claude",
-            "key": claude_key,
-            "available": bool(claude_key)
-        })
-        
-        # Model 2: OpenAI
-        models.append({
-            "num": "2",
-            "name": "OpenAI GPT-4o",
-            "provider": "openai",
-            "key": openai_key,
-            "available": bool(openai_key)
-        })
-        
-        # Model 3: Gemini
-        models.append({
-            "num": "3",
-            "name": "Google Gemini Pro",
-            "provider": "gemini",
-            "key": gemini_key,
-            "available": bool(gemini_key)
-        })
-        
-        # Model 4: Ollama
-        models.append({
-            "num": "4",
-            "name": "Ollama (Local LLaMA 3)",
-            "provider": "ollama",
-            "key": None,
-            "available": True
-        })
-        
-        # Display models
-        for model in models:
-            status = "✅ AVAILABLE" if model["available"] else "⚠  REQUIRES SETUP"
-            print(f"{model['num']}. {model['name']}")
-            print(f"   Provider: {model['provider'].upper()}")
-            print(f"   Status: {status}")
-            if model["key"]:
-                print(f"   API Key: {model['key'][:15]}...{model['key'][-5:]}")
-            print()
-        
-        print("5. Enter API Key Manually\n")
-        
-        # Get selection
-        while True:
-            choice = input("Select AI Model (1-5): ").strip()
+        if not openai_key:
+            print("⚠️  No OpenAI API key found in environment")
+            openai_key = input("\nEnter your OpenAI API Key: ").strip()
             
-            if choice == "5":
-                return self._manual_api_key_entry()
+            if not openai_key:
+                print("❌ No API key provided")
+                return False
             
-            if choice in ["1", "2", "3", "4"]:
-                selected = models[int(choice) - 1]
-                
-                if not selected["available"] and choice != "4":
-                    print(f"❌ No API key found for {selected['name']}")
-                    retry = input("Enter API key manually? (y/n): ").strip().lower()
-                    if retry == "y":
-                        return self._manual_api_key_entry()
-                    continue
-                
-                self.model_provider = selected["provider"]
-                self.api_key = selected["key"]
-                
-                print(f"\n✅ Selected: {selected['name']}\n")
-                return self._initialize_client()
-            
-            print("❌ Invalid selection. Try again.")
-    
-    def _manual_api_key_entry(self):
-        """Manual API key entry"""
-        print("\n" + "="*70)
-        print("🔑 MANUAL API KEY ENTRY")
-        print("="*70 + "\n")
+            # Save to environment for this session
+            os.environ["OPENAI_API_KEY"] = openai_key
         
-        print("Select Provider:")
-        print("1. Anthropic Claude")
-        print("2. OpenAI GPT-4")
-        print("3. Google Gemini")
-        print()
+        self.api_key = openai_key
+        self.model_provider = "openai"
         
-        choice = input("Select provider (1-3): ").strip()
+        # Display configuration
+        print(f"\n✅ OpenAI Configuration:")
+        print(f"   API Key: {openai_key[:15]}...{openai_key[-5:]}")
+        print(f"   Model: {os.getenv('OPENAI_MODEL', 'gpt-4o')}")
+        print(f"   Embedding: {os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-large')}\n")
         
-        providers = {
-            "1": "claude",
-            "2": "openai",
-            "3": "gemini"
-        }
-        
-        if choice not in providers:
-            print("❌ Invalid selection")
-            return False
-        
-        self.model_provider = providers[choice]
-        api_key = input(f"\nEnter your {self.model_provider.upper()} API Key: ").strip()
-        
-        if not api_key:
-            print("❌ No API key provided")
-            return False
-        
-        self.api_key = api_key
-        
-        # Save to environment
-        env_vars = {
-            "claude": "ANTHROPIC_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "gemini": "GOOGLE_API_KEY"
-        }
-        os.environ[env_vars[self.model_provider]] = api_key
-        
-        print(f"\n✅ API Key saved for {self.model_provider.upper()}")
         return self._initialize_client()
     
+    
     def _initialize_client(self):
-        """Initialize AI client"""
+        """Initialize LangChain OpenAI client"""
         try:
-            if self.model_provider == "claude":
-                import anthropic
-                self.client = anthropic.Anthropic(api_key=self.api_key)
-                print("✅ Claude client initialized")
-                return True
-            
-            elif self.model_provider == "openai":
-                import openai
-                openai.api_key = self.api_key
-                self.client = openai
-                print("✅ OpenAI client initialized")
-                return True
-            
-            elif self.model_provider == "gemini":
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self.client = genai.GenerativeModel('gemini-pro')
-                print("✅ Gemini client initialized")
-                return True
-            
-            elif self.model_provider == "ollama":
-                response = requests.get("http://localhost:11434/api/tags", timeout=5)
-                if response.status_code == 200:
-                    self.client = requests
-                    print("✅ Ollama client initialized")
-                    return True
-                else:
-                    print("❌ Ollama not running. Start with: ollama serve")
-                    return False
-        
-        except ImportError as e:
-            print(f"❌ Missing library. Install with: pip3 install {self.model_provider}")
+            from langchain_openai import ChatOpenAI
+            self.client = ChatOpenAI(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                temperature=0,
+                openai_api_key=self.api_key
+            )
+            print("✅ LangChain OpenAI client initialized")
+            return True
+        except ImportError:
+            print("❌ Missing LangChain library. Install with: pip install langchain-openai")
             return False
         except Exception as e:
             print(f"❌ Initialization error: {e}")
@@ -262,6 +148,9 @@ class AISOCCopilot:
             if choice in ["1", "2", "3", "4", "5"]:
                 selected = datasets[int(choice) - 1]
                 print(f"\n✅ Selected: {selected['name']}")
+                
+                # Store dataset type for collection naming
+                self.current_dataset_type = selected['type']
                 
                 if selected['type'] == 'mordor':
                     return self._load_mordor_dataset()
@@ -474,54 +363,145 @@ class AISOCCopilot:
             print(f"❌ Error: {e}")
             return []
     
-    def analyze_with_ai(self, log: Dict) -> Dict:
-        """Analyze with AI"""
-        prompt = f"""You are a Tier-1 SOC analyst. Analyze this security event and respond with ONLY valid JSON (no markdown):
-
-Event Data:
-{json.dumps(log, indent=2)}
-
-Respond with EXACTLY this JSON:
-{{
-  "severity": "CRITICAL|HIGH|MEDIUM|LOW",
-  "confidence": 85,
-  "threat_type": "brief category",
-  "mitre_attack": "T#### - Technique Name",
-  "ip_reputation": "Malicious|Suspicious|Clean|Internal",
-  "analysis": "2-3 sentence analysis",
-  "recommendation": "Specific action",
-  "auto_escalate": true,
-  "ioc_indicators": ["indicator1"]
-}}"""
-
+    def initialize_rag(self, dataset_type: str) -> bool:
+        """Initialize RAG with Milvus using dataset-specific collection"""
+        print("\n" + "="*70)
+        print("🧠 RAG (Retrieval-Augmented Generation) Setup")
+        print("="*70 + "\n")
+        
+        use_rag = input("Enable RAG for enhanced context-aware analysis? (y/n): ").strip().lower()
+        
+        if use_rag != 'y':
+            print("⏭️  Skipping RAG setup - using standard analysis\n")
+            return False
+        
+        milvus_host = os.getenv("MILVUS_HOST", "localhost")
+        milvus_port = os.getenv("MILVUS_PORT", "19530")
+        
+        # Create dataset-specific collection name
+        collection_name = f"soc_{dataset_type}_events"
+        
+        print(f"📦 Using collection: {collection_name}")
+        print(f"   (Each dataset has its own isolated knowledge base)")
+        
         try:
-            if self.model_provider == "gemini":
-                response = self.client.generate_content(prompt)
-                response_text = response.text.strip()
-            elif self.model_provider == "claude":
-                message = self.client.messages.create(
-                    model="claude-sonnet-4-20250514",
-                    max_tokens=1000,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                response_text = message.content[0].text.strip()
-            elif self.model_provider == "openai":
-                response = self.client.ChatCompletion.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=1000
-                )
-                response_text = response.choices[0].message.content.strip()
-            else:
-                return self._fallback_analysis(log)
+            self.rag_manager = RAGManager(
+                milvus_host=milvus_host,
+                milvus_port=milvus_port,
+                collection_name=collection_name
+            )
             
-            response_text = response_text.replace("json", "").replace("", "").strip()
-            analysis = json.loads(response_text)
-            return analysis
+            if not self.rag_manager.connect():
+                print("⚠️  Failed to connect to Milvus. Make sure Docker containers are running.")
+                print("   Run: python setup_docker.py")
+                return False
+            
+            if not self.rag_manager.initialize_vector_store():
+                return False
+            
+            self.use_rag = True
+            print(f"✅ RAG enabled for {dataset_type.upper()} dataset\n")
+            return True
+            
+        except Exception as e:
+            print(f"❌ RAG initialization failed: {e}")
+            print("   Continuing with standard analysis\n")
+            return False
+    
+    def analyze_with_ai(self, log: Dict) -> Dict:
+        """Analyze with AI using LangChain (with optional RAG context)"""
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain_core.output_parsers import PydanticOutputParser
+        from pydantic import BaseModel, Field
+        from typing import List
+        
+        # Define output schema
+        class SecurityAnalysis(BaseModel):
+            severity: str = Field(description="Severity level: CRITICAL, HIGH, MEDIUM, or LOW")
+            confidence: int = Field(description="Confidence score 0-100")
+            threat_type: str = Field(description="Brief threat category")
+            mitre_attack: str = Field(description="MITRE ATT&CK technique (e.g., T1110 - Brute Force)")
+            ip_reputation: str = Field(description="IP reputation: Malicious, Suspicious, Clean, or Internal")
+            analysis: str = Field(description="2-3 sentence analysis")
+            recommendation: str = Field(description="Specific action to take")
+            auto_escalate: bool = Field(description="Whether to auto-escalate this alert")
+            ioc_indicators: List[str] = Field(description="List of IOC indicators")
+        
+        # Get RAG context with IP profiling if enabled
+        rag_context = ""
+        if self.use_rag and self.rag_manager:
+            try:
+                query = self.rag_manager.prepare_event_text(log)
+                source_ip = log.get('source_ip')
+                dest_ip = log.get('dest_ip')
+                
+                # Get context including IP behavioral profiles
+                rag_context = self.rag_manager.get_augmented_context(
+                    query, 
+                    top_k=3,
+                    include_ip_profile=True,
+                    source_ip=source_ip,
+                    dest_ip=dest_ip
+                )
+            except Exception as e:
+                print(f"⚠️  RAG context retrieval failed: {e}")
+                rag_context = ""
+        
+        # Create output parser
+        parser = PydanticOutputParser(pydantic_object=SecurityAnalysis)
+        
+        # Create prompt template
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", "You are a Tier-1 SOC analyst specialized in threat detection and analysis."),
+            ("user", """Analyze this security event and provide a structured assessment.
+
+{rag_context}
+
+CURRENT EVENT TO ANALYZE:
+{event_data}
+
+{format_instructions}""")
+        ])
+        
+        # Build the chain
+        chain = prompt_template | self.client | parser
+        
+        try:
+            # Invoke the chain
+            result = chain.invoke({
+                "rag_context": rag_context if rag_context else "No historical context available.",
+                "event_data": json.dumps(log, indent=2),
+                "format_instructions": parser.get_format_instructions()
+            })
+            
+            # Convert Pydantic model to dict
+            return result.dict()
         
         except Exception as e:
-            print(f"⚠  AI Error: {e}")
-            return self._fallback_analysis(log)
+            print(f"⚠  LangChain Error: {e}")
+            # Try simple fallback without structured output
+            try:
+                from langchain_core.messages import HumanMessage
+                
+                simple_prompt = f"""You are a SOC analyst. Analyze this security event and respond with ONLY valid JSON:
+
+{rag_context if rag_context else ""}
+
+EVENT: {json.dumps(log, indent=2)}
+
+Respond with this exact JSON structure:
+{{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "confidence": 85, "threat_type": "brief category", "mitre_attack": "T#### - Technique", "ip_reputation": "Malicious|Suspicious|Clean|Internal", "analysis": "brief analysis", "recommendation": "action", "auto_escalate": true, "ioc_indicators": ["indicator1"]}}"""
+                
+                response = self.client.invoke([HumanMessage(content=simple_prompt)])
+                response_text = response.content.strip()
+                
+                # Clean and parse
+                response_text = response_text.replace("```json", "").replace("```", "").strip()
+                return json.loads(response_text)
+                
+            except Exception as e2:
+                print(f"⚠  Fallback also failed: {e2}")
+                return self._fallback_analysis(log)
     
     def _fallback_analysis(self, log: Dict) -> Dict:
         """Fallback analysis"""
@@ -659,10 +639,12 @@ def main():
     
     copilot.display_banner()
     
+    # Initialize OpenAI
     if not copilot.select_ai_model():
         print("❌ Failed to initialize AI model")
         return
     
+    # Select dataset
     logs = copilot.select_dataset()
     
     if not logs:
@@ -670,7 +652,76 @@ def main():
         return
     
     print(f"\n📊 Dataset contains {len(logs)} events")
-    max_alerts = input(f"How many to analyze? (max {len(logs)}) [20]: ").strip()
+    print(f"📁 Dataset type: {copilot.current_dataset_type.upper()}")
+    
+    # Initialize RAG with dataset-specific collection
+    rag_initialized = copilot.initialize_rag(copilot.current_dataset_type)
+    
+    # If RAG is enabled, check if we need to ingest data
+    if rag_initialized and copilot.use_rag and copilot.rag_manager:
+        # Check if collection is already populated
+        stats = copilot.rag_manager.get_collection_stats()
+        existing_count = stats.get('num_entities', 0)
+        
+        if existing_count > 0:
+            print("\n" + "="*70)
+            print(f"📚 Existing Knowledge Base Found")
+            print("="*70)
+            print(f"\n   Collection already contains {existing_count} vectors")
+            print(f"   Dataset: {copilot.current_dataset_type.upper()}")
+            
+            reingest = input(f"\n   Re-ingest dataset? This will REPLACE existing data (y/n): ").strip().lower()
+            
+            if reingest == 'y':
+                print(f"\n   Dropping existing collection...")
+                copilot.rag_manager.drop_collection()
+                copilot.rag_manager.initialize_vector_store()
+                should_ingest = True
+            else:
+                print(f"\n   ✓ Using existing knowledge base")
+                should_ingest = False
+        else:
+            should_ingest = True
+        
+        # Ingest data if needed
+        if should_ingest:
+            print("\n" + "="*70)
+            print(f"📥 Building Knowledge Base for {copilot.current_dataset_type.upper()}")
+            print("="*70)
+            
+            print(f"\n🧠 Ingesting ENTIRE dataset ({len(logs)} events) into Milvus...")
+            print("   This builds IP-based patterns and behavioral profiles")
+            print("   Processing in batches for optimal performance...\n")
+            
+            try:
+                # Ingest ALL events for comprehensive learning
+                copilot.rag_manager.insert_events(logs, batch_size=100)
+                
+                # Show stats
+                stats = copilot.rag_manager.get_collection_stats()
+                print(f"\n📈 Knowledge Base Stats:")
+                print(f"   Collection: {stats.get('collection_name', 'N/A')}")
+                print(f"   Total Vectors: {stats.get('num_entities', 0)}")
+                print(f"   Source Events: {len(logs)}")
+                print(f"   Status: {stats.get('status', 'unknown')}")
+                
+                # Build IP profile index
+                print(f"\n🔍 Building IP behavior profiles...")
+                copilot.rag_manager.build_ip_profiles(logs)
+                
+            except Exception as e:
+                print(f"⚠️  Knowledge base indexing failed: {e}")
+                print("   Continuing with standard analysis...")
+        else:
+            # Still build IP profiles from current data
+            try:
+                print(f"\n🔍 Building IP behavior profiles from current dataset...")
+                copilot.rag_manager.build_ip_profiles(logs)
+            except Exception as e:
+                print(f"⚠️  IP profiling failed: {e}")
+    
+    # Process alerts
+    max_alerts = input(f"\nHow many events to analyze? (max {len(logs)}) [20]: ").strip()
     
     try:
         max_alerts = int(max_alerts) if max_alerts else 20
@@ -689,14 +740,22 @@ def main():
         
         print("\n✅ Analysis Complete!")
         print("📂 Check ./output/ folder for results")
+        
+        # Cleanup
+        if copilot.rag_manager:
+            copilot.rag_manager.disconnect()
     
     except KeyboardInterrupt:
         print("\n\n⚠  Interrupted by user")
+        if copilot.rag_manager:
+            copilot.rag_manager.disconnect()
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
+        if copilot.rag_manager:
+            copilot.rag_manager.disconnect()
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
