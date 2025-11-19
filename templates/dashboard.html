@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOC-ASTRA - Real-Time Incident Triage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🛡️ SOC-ASTRA</h1>
+                    <span class="subtitle">Real-Time Incident Triage</span>
+                </div>
+                <div class="system-status">
+                    <div class="status-indicator" id="statusIndicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Live</span>
+                    </div>
+                    <div class="queue-info" id="queueInfo">
+                        <span>Queue: <strong id="queueSize">0</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Statistics Panel -->
+            <section class="stats-panel">
+                <div class="stat-card" id="statTotal">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalIncidents">0</div>
+                        <div class="stat-label">Total Incidents (24h)</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card critical" id="statCritical">
+                    <div class="stat-icon">🔴</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="criticalCount">0</div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card high" id="statHigh">
+                    <div class="stat-icon">🟠</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="highCount">0</div>
+                        <div class="stat-label">High</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card medium" id="statMedium">
+                    <div class="stat-icon">🟡</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="mediumCount">0</div>
+                        <div class="stat-label">Medium</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card low" id="statLow">
+                    <div class="stat-icon">🔵</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="lowCount">0</div>
+                        <div class="stat-label">Low</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Filter Bar -->
+            <section class="filter-bar">
+                <div class="filter-group">
+                    <label>Severity:</label>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-severity="all">All</button>
+                        <button class="filter-btn" data-severity="CRITICAL">Critical</button>
+                        <button class="filter-btn" data-severity="HIGH">High</button>
+                        <button class="filter-btn" data-severity="MEDIUM">Medium</button>
+                        <button class="filter-btn" data-severity="LOW">Low</button>
+                    </div>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Status:</label>
+                    <select id="statusFilter" class="filter-select">
+                        <option value="">All Statuses</option>
+                        <option value="new">New</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="dismissed">Dismissed</option>
+                        <option value="escalated">Escalated</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Search IP:</label>
+                    <input type="text" id="ipSearch" class="filter-input" placeholder="192.168.1.100">
+                </div>
+                
+                <div class="filter-group">
+                    <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
+                </div>
+            </section>
+
+            <!-- Incident Feed -->
+            <section class="incident-feed">
+                <div class="feed-header">
+                    <h2>Incident Feed</h2>
+                    <div class="auto-refresh-toggle">
+                        <label>
+                            <input type="checkbox" id="autoRefresh" checked>
+                            Auto-refresh (5s)
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="incidentList" class="incident-list">
+                    <!-- Loading state -->
+                    <div class="loading" id="loadingState">
+                        <div class="spinner"></div>
+                        <p>Loading incidents...</p>
+                    </div>
+                    
+                    <!-- Empty state -->
+                    <div class="empty-state" id="emptyState" style="display: none;">
+                        <div class="empty-icon">🎯</div>
+                        <h3>No Incidents Found</h3>
+                        <p>All clear! No incidents match your current filters.</p>
+                    </div>
+                    
+                    <!-- Incidents will be dynamically inserted here -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Incident Detail Modal -->
+    <div id="incidentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Incident Details</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Details will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
+
+
+
+

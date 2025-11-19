@@ -1,0 +1,32 @@
+# Seed IPs Configuration for SOC-ASTRA Knowledge Base
+
+internal_ips:
+  - 10.0.1.10      # Domain Controller
+  - 10.0.1.20      # File Server
+  - 10.0.1.30      # Web Server
+  - 192.168.1.50   # Workstation
+  - 192.168.1.51   # Admin Workstation
+
+external_ips:
+  - 203.0.113.50   # Known attacker IP
+  - 198.51.100.25  # Suspicious IP
+  - 185.220.101.40 # Tor exit node
+  - 45.142.120.50  # Botnet C2
+
+suspicious_internal_ips:
+  - 10.0.1.99      # Potentially compromised host
+
+event_generation:
+  events_per_ip: 50-200     # Random range per IP
+  time_span_days: 30        # Spread events over 30 days
+  attack_scenarios:
+    - brute_force
+    - lateral_movement
+    - data_exfiltration
+    - privilege_escalation
+    - reconnaissance
+    - malware_execution
+
+
+
+

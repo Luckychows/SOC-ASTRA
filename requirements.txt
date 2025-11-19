@@ -1,0 +1,32 @@
+# Core Dependencies
+requests
+pandas
+python-dotenv
+
+
+# LangChain - Latest versions
+langchain
+langchain-core
+langchain-openai
+langchain-community
+langchain-text-splitters
+
+# Pydantic - Latest
+pydantic
+pydantic-settings
+
+# Vector Database
+pymilvus
+
+# Text Processing
+tiktoken
+
+# Data Processing
+numpy
+
+# Web Framework
+Flask
+flask-cors
+
+# Configuration
+PyYAML
