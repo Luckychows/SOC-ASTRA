@@ -207,7 +207,7 @@ Modern, responsive web interface:
 
 1. **Clone or navigate to the project:**
 ```bash
-cd C:\Users\sumod\SOC-ASTRA
+cd SOC-ASTRA
 ```
 
 2. **Install Python dependencies:**
